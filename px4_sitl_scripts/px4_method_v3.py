@@ -160,15 +160,15 @@ class XYController:
 
     def __init__(
         self,
-        Kp_pos: float = 0.50,
-        Kp_vel: float = 1.8, #1.8
+        Kp_pos: float = 0.95,
+        Kp_vel: float = 1.8,
         Ki_vel: float = 0.4,
         Kd_vel: float = 0.2,
         hover_thrust: float = 0.73,
         max_vel_xy: float = 5.0,       # m/s – MPC_XY_VEL_MAX
-        max_tilt: float = np.radians(10.0),  # rad – MPC_TILTMAX_AIR
+        max_tilt: float = np.radians(35.0),  # rad – MPC_TILTMAX_AIR
         max_thr_xy: float = 0.9,
-        tau_d: float = 0.0,            # derivative LP filter time constant
+        tau_d: float = 0.1,            # derivative LP filter time constant
     ):
         self.Kp_pos     = Kp_pos
         self.Kp_vel     = Kp_vel
@@ -224,7 +224,7 @@ class XYController:
         )
 
         # ── 3. Anti-windup (clamp integrator if saturated) ─────────────
-        thr_xy_raw = acc_sp / 9.81 # * self.hover_thrust
+        thr_xy_raw = acc_sp / 9.81 * self.hover_thrust
         saturated  = np.linalg.norm(thr_xy_raw) >= self.max_thr_xy
 
         # Only integrate when not saturated AND error pushes away from limit
@@ -240,7 +240,7 @@ class XYController:
 
         # ── 4. acc → normalised thrust (horizontal part) ───────────────
         # PX4: thr_sp_xy = acc_sp_xy / g * hover_thrust
-        thr_xy = acc_sp / 9.81 # * self.hover_thrust
+        thr_xy = acc_sp / 9.81 * self.hover_thrust
 
         # ── 5. Tilt limiting: project onto max tilt cone ───────────────
         # max horizontal thrust given the Z thrust must stay above min
@@ -437,7 +437,10 @@ class PositionControllerNode(Node):
 
     def _publish_attitude_setpoint(self):
         #self.pos_sp = np.array([float(self.counter/self.RATE_HZ), 0.0, -2.5])
-        self.pos_sp = np.array([1.0, 0.0, -2.5])
+        if self.counter % 1000 < 500:
+            self.pos_sp = np.array([1.0, 0.0, -2.5])
+        else:
+            self.pos_sp = np.array([0.0, 0.0, -2.5])
 
         # ── XY: position + velocity → horizontal thrust vector ─────────
         thr_xy = self.xy_ctrl.update(

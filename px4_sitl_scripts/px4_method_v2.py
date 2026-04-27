@@ -490,7 +490,7 @@ class PositionControllerNode(Node):
 
     def _publish_attitude_setpoint(self):
         #self.pos_sp = np.array([float(self.counter/self.RATE_HZ), 0.0, -2.5])
-        if self.counter % 2000 < 1000:
+        if self.counter % 100 < 500:
             self.pos_sp = np.array([1.0, 0.0, -2.5])
         else:
             self.pos_sp = np.array([0.0, 0.0, -2.5])

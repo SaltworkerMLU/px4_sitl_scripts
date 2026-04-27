@@ -17,8 +17,7 @@ class MotorCommander(Node):
         self.vel = [0.0, 0.0, 0.0]
         self.acc = [0.0, 0.0, 0.0]
 
-
-
+        # Configure QoS for PX4 topics
         qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
@@ -26,6 +25,7 @@ class MotorCommander(Node):
             depth=5
         )
 
+        # Subscribe to vehicle odometry to get position and velocity feedback
         self.subscription = self.create_subscription(
             VehicleOdometry,
             '/fmu/out/vehicle_odometry',
@@ -33,60 +33,53 @@ class MotorCommander(Node):
             qos
         )
 
-        #self.q_pub = self.create_publisher(VehicleAttitudeSetpoint, '/fmu/in/vehicle_attitude_setpoint_v1', qos)
         self.vel_pub = self.create_publisher(TrajectorySetpoint, '/fmu/in/trajectory_setpoint', qos)
-        #self.actuator_pub = self.create_publisher(ActuatorMotors, '/fmu/in/actuator_motors', qos)
         self.offboard_pub = self.create_publisher(OffboardControlMode, '/fmu/in/offboard_control_mode', qos)
         self.command_pub  = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', qos)
 
         self.counter = 0
-        # Run at 20 Hz — offboard mode requires >2 Hz heartbeat
-        self.timer = self.create_timer(0.01, self.timer_callback)
+        # Run at 50 Hz
+        self.timer = self.create_timer(0.02, self.timer_callback)
 
     def timer_callback(self):
         self.publish_offboard_control_mode()
         self.publish_trajectory()
 
-        # After ~0.5s of streaming (10 cycles), arm and switch mode
+        # Arm and switch mode
         if self.counter == 10:
-            self.switch_to_offboard_mode()
             self.arm()
+            self.switch_to_offboard_mode()
 
         self.counter += 1
 
     def publish_offboard_control_mode(self):
-        #msg.direct_actuator = True  # Must be True for actuator_motors to work
         msg = OffboardControlMode()
-        msg.velocity = False # True
-        msg.position = True # False
+
+        # Configure control mode
+        msg.timestamp = self.get_clock().now().nanoseconds // 1000
+        msg.position = True
+        msg.velocity = False
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
-        msg.timestamp = self.get_clock().now().nanoseconds // 1000
+        msg.thrust_and_torque = False
+        msg.direct_actuator = False
         
         self.offboard_pub.publish(msg)
 
+    # Print odometry feedback and update internal state
     def odometry_callback(self, msg):
-        #bige = np.array([self.counter*0.02,0.0,-2.5])-np.array(self.pos)
         self.get_logger().info(f'{msg.position}\t{msg.velocity}')
         self.x, self.y, self.z = msg.position[0], msg.position[1], msg.position[2]
         self.dx, self.dy, self.dz = msg.velocity[0], msg.velocity[1], msg.velocity[2]
 
+    # Publish trajectory setpoint to command the drone's position
     def publish_trajectory(self):
  
-        #t = self.counter * 0.05
-        #u = 1.0
-        #ex = 0.95 * (2.0 - self.x)
-        #ey = 0.95 * (1.0 - self.y)
-        #ez = 1.0 * (-2.0 - self.z)
-        #y_k1 = self.pos[1] + 0.05 * (-self.pos[1] + u)
-
-        #self.acc[1] = self.acc[1] + 0.02 * (-self.acc[1] + u) # np.exp(-self.counter*0.02)
-        #self.get_logger().info(f'{self.acc[1]}')
-
         msg = TrajectorySetpoint()
         
-        if self.counter % 2000 < 1000:
+        # Alternate between two positions to create a back-and-forth motion in the x-axis
+        if self.counter % 100 < 500:
             msg.acceleration = [0.0, 0.0, 0.0]
             msg.velocity = [0.0, 0.0, 0.0] # [float('nan')] * 3
             msg.position = [1.0, 0.0, -2.5] # [self.counter*0.02, 0.0, -2.5]
@@ -94,11 +87,12 @@ class MotorCommander(Node):
             msg.acceleration = [0.0, 0.0, 0.0]
             msg.velocity = [0.0, 0.0, 0.0] # [float('nan')] * 3
             msg.position = [0.0, 0.0, -2.5] # [self.counter*0.02, 0.0, -2.5]
-        self.get_logger().info(f'{self.counter % 5000}')
+
         msg.yaw = 0.0
         msg.timestamp = self.get_clock().now().nanoseconds // 1000
         self.vel_pub.publish(msg)
 
+    # Arms the drone automatically
     def arm(self):
         msg = VehicleCommand()
         msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
@@ -112,6 +106,7 @@ class MotorCommander(Node):
         self.command_pub.publish(msg)
         self.get_logger().info('Arm command sent')
 
+    # Switch to offboard mode to allow external control
     def switch_to_offboard_mode(self):
         msg = VehicleCommand()
         msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
