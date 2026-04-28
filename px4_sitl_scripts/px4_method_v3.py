@@ -501,6 +501,8 @@ class PositionControllerNode(Node):
         msg.position     = False
         msg.velocity     = False
         msg.acceleration = False
+        msg.thrust_and_torque = False
+        msg.direct_actuator = False #True
         msg.timestamp    = self.get_clock().now().nanoseconds // 1000
         self.offboard_pub.publish(msg)
 

@@ -40,6 +40,7 @@ setup(
                 'px4_method_v2 = px4_sitl_scripts.px4_method_v2:main',
                 'px4_method_v3 = px4_sitl_scripts.px4_method_v3:main',
                 'serial_coms = px4_sitl_scripts.serial_coms:main',
+                'inner_loop_nodes = px4_sitl_scripts.inner_loop_nodes:main',
         ],
     },
 )

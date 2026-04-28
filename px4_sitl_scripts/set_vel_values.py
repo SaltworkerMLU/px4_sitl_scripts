@@ -39,7 +39,7 @@ class MotorCommander(Node):
 
         self.counter = 0
         # Run at 50 Hz
-        self.timer = self.create_timer(0.02, self.timer_callback)
+        self.timer = self.create_timer(0.01, self.timer_callback)
 
     def timer_callback(self):
         self.publish_offboard_control_mode()
@@ -78,8 +78,11 @@ class MotorCommander(Node):
  
         msg = TrajectorySetpoint()
         
+        #if self.counter % 2000 == 1000 or self.counter % 2000 == 0:
+
+
         # Alternate between two positions to create a back-and-forth motion in the x-axis
-        if self.counter % 100 < 500:
+        if self.counter % 2000 < 1000:
             msg.acceleration = [0.0, 0.0, 0.0]
             msg.velocity = [0.0, 0.0, 0.0] # [float('nan')] * 3
             msg.position = [1.0, 0.0, -2.5] # [self.counter*0.02, 0.0, -2.5]

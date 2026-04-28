@@ -259,7 +259,7 @@ class XYController:
 #             PositionControl::_velocityController()  (PID on vz)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class ZController:
+'''class ZController:
     """
     Cascaded P(z) → PID(vz) → collective thrust (NED, D-axis).
 
@@ -278,9 +278,9 @@ class ZController:
     def __init__(
         self,
         Kp_pos: float  = 1.0,
-        Kp_vel: float  = 4.0,
-        Ki_vel: float  = 2.0,
-        Kd_vel: float  = 0.0,
+        Kp_vel: float  = 1.5, # 4.0,
+        Ki_vel: float  = 1.0, # 2.0,
+        Kd_vel: float  = 0.0, # 0.0,
         hover_thrust: float = 0.73,
         thr_min: float = 0.12,
         thr_max: float = 0.90,
@@ -301,6 +301,7 @@ class ZController:
 
         self._vel_int  = 0.0
         self._vz_filt  = 0.0
+        self.past_vel = 0.0
 
     def reset(self):
         self._vel_int = 0.0
@@ -354,7 +355,86 @@ class ZController:
             self._vel_int = float(np.clip(self._vel_int,
                                           -self.thr_max, self.thr_max))
 
-        return thrust_d   # already negative (NED upward)
+        return thrust_d   # already negative (NED upward)'''
+
+class ZController:
+    """
+    Non-cascaded PID controller: z_error → collective thrust (NED, D-axis).
+    Uses only measured z position — no velocity measurement required.
+    D term is computed as a filtered finite difference of position error.
+    """
+
+    def __init__(
+        self,
+        Kp: float = 2.0,
+        Ki: float = 4.0,
+        Kd: float = 0.4,
+        hover_thrust: float = 0.73,
+        thr_min: float = 0.12,
+        thr_max: float = 0.90,
+        tau_d: float = 0.25,
+    ):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.hover_thrust = hover_thrust
+        self.thr_min = thr_min
+        self.thr_max = thr_max
+        self.tau_d = tau_d
+
+        self._int = 0.0
+        self._deriv_filt = 0.0
+        self._err_prev = None       # None until first call
+
+    def reset(self):
+        self._int = 0.0
+        self._deriv_filt = 0.0
+        self._err_prev = None
+
+    def update(self, z_sp: float, z: float, dt: float) -> float:
+        """
+        Returns thrust_body[2]: always negative (upward),
+        clamped to [-thr_max, -thr_min].
+
+        z_sp, z  in NED metres  (negative = above ground)
+        """
+        if dt <= 0.0:
+            return -self.hover_thrust
+
+        # ── 1. Position error ──────────────────────────────────────────
+        error = z_sp - z
+
+        # ── 2. Filtered finite-difference derivative ───────────────────
+        if self._err_prev is None:
+            raw_deriv = 0.0
+        else:
+            raw_deriv = (error - self._err_prev) / dt
+
+        alpha = self.tau_d / (self.tau_d + dt)
+        self._deriv_filt = alpha * self._deriv_filt + (1.0 - alpha) * raw_deriv
+        self._err_prev = error
+
+        # ── 3. PID law ─────────────────────────────────────────────────
+        thrust = (
+            self.Kp * error
+            + self.Ki * self._int
+            + self.Kd * self._deriv_filt
+            - self.hover_thrust
+        )
+
+        # ── 4. Saturate ────────────────────────────────────────────────
+        u_min = -self.thr_max
+        u_max = -self.thr_min
+        thrust = float(np.clip(thrust, u_min, u_max))
+
+        # ── 5. Anti-windup ─────────────────────────────────────────────
+        stop = (thrust >= u_max and error >= 0.0) or \
+               (thrust <= u_min and error <= 0.0)
+        if not stop:
+            self._int += error * dt
+            self._int = float(np.clip(self._int, -self.thr_max, self.thr_max))
+
+        return thrust
 
 class PositionOnlyPDController:
     """
@@ -425,7 +505,7 @@ class PositionControllerNode(Node):
         self.yaw_sp = 0.0                            # rad
 
         # ── Control rate ───────────────────────────────────────────────
-        self.RATE_HZ = 50
+        self.RATE_HZ = 100
         self.dt      = 1.0 / self.RATE_HZ
 
         # ── Controllers ────────────────────────────────────────────────
@@ -472,6 +552,7 @@ class PositionControllerNode(Node):
 
     def odometry_cb(self, msg: VehicleOdometry):
         self.pos = np.array([msg.position[0], msg.position[1], msg.position[2]])
+        self.past_vel = self.vel
         self.vel = np.array([msg.velocity[0], msg.velocity[1], msg.velocity[2]])
 
     def timer_cb(self):
@@ -490,10 +571,10 @@ class PositionControllerNode(Node):
 
     def _publish_attitude_setpoint(self):
         #self.pos_sp = np.array([float(self.counter/self.RATE_HZ), 0.0, -2.5])
-        if self.counter % 100 < 500:
-            self.pos_sp = np.array([1.0, 0.0, -2.5])
+        if self.counter % 1000 < 500:
+            self.pos_sp = np.array([0.0, 0.0, -2])
         else:
-            self.pos_sp = np.array([0.0, 0.0, -2.5])
+            self.pos_sp = np.array([0.0, 0.0, -1])
 
         # ── XY: position + velocity → horizontal thrust vector ─────────
         """thr_xy = self.xy_ctrl.update(
@@ -511,7 +592,7 @@ class PositionControllerNode(Node):
         thr_z = self.z_ctrl.update(
             z_sp = self.pos_sp[2],
             z    = self.pos[2],
-            vz   = self.vel[2],
+            #vz   = self.vel[2],
             dt   = self.dt,
         )
 
