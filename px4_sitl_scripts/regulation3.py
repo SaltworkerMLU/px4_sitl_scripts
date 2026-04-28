@@ -6,7 +6,7 @@ s = control.tf('s')
 
 # ── Physical constants ─────────────────────────────────────────────────────
 g      = 9.81   # m/s²
-J      = 0.01   # moment of inertia (kg·m²) — tune to your x500 airframe
+J      = 0.02166666666666667   # moment of inertia (kg·m²) — tune to your x500 airframe
                 # x500 typical: Ixx ≈ Iyy ≈ 0.01–0.02 kg·m²
 
 # ── PX4 gains ─────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ C_pos  = Kp_pos                                              # P   on position
 # Loop 4: rate loop   θ_dot_ref → θ_dot
 #   open-loop: C_rate · P_angacc
 #   C_rate acts on rate error; plant is τ → θ_dot (= 1/Js)
-G_rate = control.feedback(C_rate * P_angacc * 1/J, 1)
+G_rate = control.feedback(C_rate * P_angacc* 1/J, 1)
 
 # Loop 3: attitude loop   θ_ref → θ
 #   open-loop: C_att · (1/s) · G_rate
@@ -91,8 +91,8 @@ df2 = pd.read_csv("step_1_v3/data.csv")
 #print(df['/fmu/out/vehicle_odometry/position[0]'])
 
 #data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[200:1200]
-data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[4510:5510]
-data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[4200:5200]
+data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[4500:5500]
+data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[4190:5190]
 #data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[3370:4370]
 
 # ── Step response ─────────────────────────────────────────────────────────
