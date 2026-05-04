@@ -366,9 +366,9 @@ class XYController:
 
     def __init__(
         self,
-        Kp: float = 2.0,
-        Ki: float = 4.0,
-        Kd: float = 0.0,
+        Kp: float = 4.0,
+        Ki: float = 0.0,
+        Kd: float = 2.0,
         hover_thrust: float = 0.73,
         thr_min: float = 0.12,
         thr_max: float = 0.90,
@@ -531,7 +531,7 @@ class ZController:
             self._vel_int = float(np.clip(self._vel_int,
                                           -self.thr_max, self.thr_max))
 
-        return thrust_d   # already negative (NED upward)
+        return thrust_d
 
 class PositionOnlyPDController:
     """
@@ -668,10 +668,10 @@ class PositionControllerNode(Node):
 
     def _publish_attitude_setpoint(self):
         #self.pos_sp = np.array([float(self.counter/self.RATE_HZ), 0.0, -2.5])
-        if self.counter % 1000 < 500:
-            self.pos_sp = np.array([0.0, 0.0, -2])
+        if self.counter % 2000 < 1000:
+            self.pos_sp = np.array([0.0, 0.0, -2.0])
         else:
-            self.pos_sp = np.array([0.0, 0.0, -1])
+            self.pos_sp = np.array([0.0, 0.0, -1.0])
 
         # ── XY: position + velocity → horizontal thrust vector ─────────
         """thr_xy = self.xy_ctrl.update(
