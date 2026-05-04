@@ -5,15 +5,16 @@ import pandas as pd
 s = control.tf('s')
 
 # ── Physical constants ─────────────────────────────────────────────────────
-g      = 9.81   # m/s²
-J      = 0.02167 # 0.02166666666666667   # moment of inertia (kg·m²) — tune to your x500 airframe
+#g      = 9.81   # m/s²
+#J      = 0.02167 # 0.02166666666666667   # moment of inertia (kg·m²) — tune to your x500 airframe
                 # x500 typical: Ixx ≈ Iyy ≈ 0.01–0.02 kg·m²
+m = 2.0  # + 0.016*4     # kg
 
 # ── PX4 gains ─────────────────────────────────────────────────────────────
-Kp_pos  = 0.95
-Kp_vel  = 1.8;   Ki_vel  = 0.4;   Kd_vel  = 0.2
-Kp_att  = 4.0
-Kp_rate = 0.15;  Ki_rate = 0.2;   Kd_rate = 0.003
+Kp_pos  = 1.0
+Kp_vel  = 4.0;   Ki_vel  = 2.0;   Kd_vel  = 0.0
+#Kp_att  = 4.0
+#Kp_rate = 0.15;  Ki_rate = 0.2;   Kd_rate = 0.003
 
 # ══════════════════════════════════════════════════════════════════════════
 # PLANT CHAIN  (innermost → outermost)
@@ -27,9 +28,9 @@ Kp_rate = 0.15;  Ki_rate = 0.2;   Kd_rate = 0.003
 #   x      : horizontal position     (m)
 # ══════════════════════════════════════════════════════════════════════════
 
-P_angacc  = control.tf([1],    [1, 0])      # τ → θ_dot     (1/Js)
-P_att     = control.tf([1],    [1, 0])      # θ_dot → θ     (1/s)
-P_vel     = control.tf([g],    [1, 0])      # θ → ẋ         (g/s)
+#P_angacc  = control.tf([1],    [1, 0])      # τ → θ_dot     (1/Js)
+#P_att     = control.tf([1],    [1, 0])      # θ_dot → θ     (1/s)
+P_vel     = control.tf([m],    [1, -1])      # θ → ẋ         (g/s)
 P_pos     = control.tf([1],    [1, 0])      # ẋ → x         (1/s)
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -41,10 +42,10 @@ P_pos     = control.tf([1],    [1, 0])      # ẋ → x         (1/s)
 #   Loop 1 (outermost): pos  P     ẋ_ref     = C_pos  · (x_ref  − x)
 # ══════════════════════════════════════════════════════════════════════════
 
-C_rate = control.tf([Kd_rate, Kp_rate, Ki_rate], [1, 0])   # PID on pitch rate
-C_att  = Kp_att                                              # P   on pitch angle
+#C_rate = control.tf([Kd_rate, Kp_rate, Ki_rate], [1, 0])   # PID on pitch rate
+#C_att  = Kp_att                                              # P   on pitch angle
 C_vel  = control.tf([Kd_vel,  Kp_vel,  Ki_vel],  [1, 0])   # PID on velocity
-C_acc  = 1 / g                                               # accel → angle conversion
+C_acc  = 1 / 1                                               # accel → angle conversion
 C_pos  = Kp_pos                                              # P   on position
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -54,17 +55,17 @@ C_pos  = Kp_pos                                              # P   on position
 # Loop 4: rate loop   θ_dot_ref → θ_dot
 #   open-loop: C_rate · P_angacc
 #   C_rate acts on rate error; plant is τ → θ_dot (= 1/Js)
-G_rate = control.feedback(C_rate * P_angacc* 1/J, 1)
+#G_rate = control.feedback(C_rate * P_angacc* 1/J, 1)
 
 # Loop 3: attitude loop   θ_ref → θ
 #   open-loop: C_att · (1/s) · G_rate
 #   C_att produces a rate reference; G_rate tracks it; integrate rate → angle
-G_att  = control.feedback(C_att * P_att * G_rate, 1)
+#G_att  = control.feedback(C_att * P_att * G_rate, 1)
 
 # Loop 2: velocity loop   ẋ_ref → ẋ
 #   open-loop: C_vel · C_acc · P_vel · G_att
 #   C_vel·C_acc maps velocity error to an angle reference
-G_vel  = control.feedback(C_vel * C_acc * P_vel * G_att, 1)
+G_vel  = control.feedback(C_vel * C_acc * P_vel, 1)
 
 # Loop 1: position loop   x_ref → x
 #   open-loop: C_pos · P_pos · G_vel
@@ -84,16 +85,17 @@ for p in sorted(poles, key=lambda z: z.real):
 
 # -- Yes
 # Load CSV
-df1 = pd.read_csv("step_1/data.csv")
-df2 = pd.read_csv("step_1_v3/data.csv")
+df1 = pd.read_csv("PID_step_1_z_v3/data.csv")
+df2 = pd.read_csv("PID_step_1_z/data.csv")
 
 #print(df.iloc[0])
 #print(df['/fmu/out/vehicle_odometry/position[0]'])
 
-#data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[200:1200]
-data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[4500:5500]
-data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[4190:5190]
-#data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[3370:4370]
+data2 = df2['/fmu/out/vehicle_odometry/position[2]'].values[8900:9900]
+#data2 = df2['/fmu/out/vehicle_odometry/position[2]'].values[6850:7850]
+#data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[6435:7435]
+#data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[7245:8245]
+data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[13230:14230]
 
 # ── Step response ─────────────────────────────────────────────────────────
 import matplotlib.pyplot as plt
@@ -103,12 +105,12 @@ t_out, y_out = control.step_response(G_pos, T=t)
 
 plt.figure(figsize=(9, 4))
 plt.plot(t_out, y_out)
-plt.plot(t, data1)
-plt.plot(t, data2)
+plt.plot(t, data1 + 21*np.ones(len(data1)))
+plt.plot(t, data2+ 2*np.ones(len(data1)))
 plt.axhline(1.0, color='k', linestyle='--', linewidth=0.8, label='Setpoint')
-plt.title('Step Response of X-axis position')
+plt.title('Step Response of Z-axis position')
 plt.xlabel('Time (s)')
-plt.ylabel('X-position (m)')
+plt.ylabel('Z-position (m)')
 plt.legend(['Transfer function', 'Px4-Autopilot (#1)', 'Px4-Autopilot (#2)'])
 plt.grid(True, alpha=0.4)
 plt.tight_layout()

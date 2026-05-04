@@ -357,7 +357,7 @@ class XYController:
 
         return thrust_d   # already negative (NED upward)'''
 
-class ZController:
+'''class ZController:
     """
     Non-cascaded PID controller: z_error → collective thrust (NED, D-axis).
     Uses only measured z position — no velocity measurement required.
@@ -368,7 +368,7 @@ class ZController:
         self,
         Kp: float = 2.0,
         Ki: float = 4.0,
-        Kd: float = 0.4,
+        Kd: float = 0.0,
         hover_thrust: float = 0.73,
         thr_min: float = 0.12,
         thr_max: float = 0.90,
@@ -434,7 +434,104 @@ class ZController:
             self._int += error * dt
             self._int = float(np.clip(self._int, -self.thr_max, self.thr_max))
 
-        return thrust
+        return thrust'''
+
+class ZController:
+    """
+    Cascaded P(z) → PID(vz) → collective thrust (NED, D-axis).
+
+    PX4 defaults:
+        MPC_Z_P          = 1.0
+        MPC_Z_VEL_P_ACC  = 4.0
+        MPC_Z_VEL_I_ACC  = 2.0
+        MPC_Z_VEL_D_ACC  = 0.0  (usually 0 in z)
+        MPC_THR_HOVER    = 0.73
+        MPC_THR_MIN      = 0.12
+        MPC_THR_MAX      = 0.9
+        MPC_Z_VEL_MAX_UP = 3.0 m/s
+        MPC_Z_VEL_MAX_DN = 1.0 m/s
+    """
+
+    def __init__(
+        self,
+        Kp_pos: float  = 1.0,
+        Kp_vel: float  = 4.0,
+        Ki_vel: float  = 2.0,
+        Kd_vel: float  = 0.0,
+        hover_thrust: float = 0.73,
+        thr_min: float = 0.12,
+        thr_max: float = 0.90,
+        vel_max_up: float = 3.0,
+        vel_max_dn: float = 1.0,
+        tau_d: float = 0.1,
+    ):
+        self.Kp_pos      = Kp_pos
+        self.Kp_vel      = Kp_vel
+        self.Ki_vel      = Ki_vel
+        self.Kd_vel      = Kd_vel
+        self.hover_thrust = hover_thrust
+        self.thr_min     = thr_min
+        self.thr_max     = thr_max
+        self.vel_max_up  = vel_max_up   # max upward speed   (vz < 0 = up in NED)
+        self.vel_max_dn  = vel_max_dn   # max downward speed (vz > 0 = down in NED)
+        self.tau_d       = tau_d
+
+        self._vel_int  = 0.0
+        self._vz_filt  = 0.0
+
+    def reset(self):
+        self._vel_int = 0.0
+        self._vz_filt = 0.0
+
+    def update(self, z_sp: float, z: float, vz: float, dt: float) -> float:
+        """
+        Returns thrust_body[2]: always negative (upward), clamped to [−thr_max, −thr_min].
+
+        z_sp, z  in NED metres  (negative = above ground, e.g. z_sp = −2.0)
+        vz       in NED m/s     (negative = climbing)
+        """
+        if dt <= 0.0:
+            return -self.hover_thrust
+
+        # ── 1. Position loop (P) → vz setpoint ────────────────────────
+        # NED: z_sp < z means we are too low → need negative vz (climb)
+        vz_sp = self.Kp_pos * (z_sp - z)
+        vz_sp = float(np.clip(vz_sp, -self.vel_max_up, self.vel_max_dn))
+
+        # ── 2. Velocity loop (PID) ─────────────────────────────────────
+        vz_err = vz_sp - vz
+
+        # D term: low-pass filter vz, differentiate on measurement
+        alpha = self.tau_d / (self.tau_d + dt)
+        self._vz_filt = alpha * self._vz_filt + (1.0 - alpha) * vz
+
+        # PX4 _velocityController D-axis:
+        #   thrust_D = Kp*err + Ki*integral + Kd*vel_dot - hover_thrust
+        #   (equilibrium at hover_thrust → subtract to center around 0)
+        thrust_d = (
+            self.Kp_vel * vz_err
+            + self.Ki_vel * self._vel_int
+            - self.Kd_vel * self._vz_filt
+            - self.hover_thrust          # subtract hover so 0 error → hover thrust
+        )
+
+        # NED: thrust_d is negative for upward. Saturate in NED sense:
+        #   uMax = -thr_min  (least upward)
+        #   uMin = -thr_max  (most upward)
+        u_max = -self.thr_min
+        u_min = -self.thr_max
+        thrust_d = float(np.clip(thrust_d, u_min, u_max))
+
+        # ── 3. Anti-windup ─────────────────────────────────────────────
+        stop = (thrust_d >= u_max and vz_err >= 0.0) or \
+               (thrust_d <= u_min and vz_err <= 0.0)
+        if not stop:
+            self._vel_int += vz_err * dt
+            # Clamp integral magnitude
+            self._vel_int = float(np.clip(self._vel_int,
+                                          -self.thr_max, self.thr_max))
+
+        return thrust_d   # already negative (NED upward)
 
 class PositionOnlyPDController:
     """
@@ -592,7 +689,7 @@ class PositionControllerNode(Node):
         thr_z = self.z_ctrl.update(
             z_sp = self.pos_sp[2],
             z    = self.pos[2],
-            #vz   = self.vel[2],
+            vz   = self.vel[2],
             dt   = self.dt,
         )
 
