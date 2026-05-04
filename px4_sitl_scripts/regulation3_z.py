@@ -30,7 +30,7 @@ Kp_vel  = 4.0;   Ki_vel  = 2.0;   Kd_vel  = 0.0
 
 #P_angacc  = control.tf([1],    [1, 0])      # τ → θ_dot     (1/Js)
 #P_att     = control.tf([1],    [1, 0])      # θ_dot → θ     (1/s)
-P_vel     = control.tf([m],    [1, -1])      # θ → ẋ         (g/s)
+P_vel     = control.tf([m],    [1, -0.5])      # θ → ẋ         (g/s)
 P_pos     = control.tf([1],    [1, 0])      # ẋ → x         (1/s)
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -91,7 +91,7 @@ df2 = pd.read_csv("PID_step_1_z/data.csv")
 #print(df.iloc[0])
 #print(df['/fmu/out/vehicle_odometry/position[0]'])
 
-data2 = df2['/fmu/out/vehicle_odometry/position[2]'].values[8900:9900]
+data2 = df2['/fmu/out/vehicle_odometry/position[2]'].values[8895:9895]
 #data2 = df2['/fmu/out/vehicle_odometry/position[2]'].values[6850:7850]
 #data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[6435:7435]
 #data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[7245:8245]
