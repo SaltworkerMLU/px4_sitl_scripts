@@ -10,8 +10,8 @@ J      = 0.02167 # 0.02166666666666667   # moment of inertia (kg·m²) — tune 
                 # x500 typical: Ixx ≈ Iyy ≈ 0.01–0.02 kg·m²
 
 # ── PX4 gains ─────────────────────────────────────────────────────────────
-Kp_pos  = 0.95
-Kp_vel  = 1.8;   Ki_vel  = 0.4;   Kd_vel  = 0.2
+Kp_pos  = 1.0
+Kp_vel  = 0.6;   Ki_vel  = 0.0;   Kd_vel  = 1.2
 Kp_att  = 4.0
 Kp_rate = 0.15;  Ki_rate = 0.2;   Kd_rate = 0.003
 
@@ -64,7 +64,7 @@ G_att  = control.feedback(C_att * P_att * G_rate, 1)
 # Loop 2: velocity loop   ẋ_ref → ẋ
 #   open-loop: C_vel · C_acc · P_vel · G_att
 #   C_vel·C_acc maps velocity error to an angle reference
-G_vel  = control.feedback(C_vel * C_acc * P_vel * G_att, 1)   
+G_vel  = C_vel * C_acc * P_vel * G_att # control.feedback(C_vel * C_acc * P_vel * G_att, 1)   
 
 # Loop 1: position loop   x_ref → x
 #   open-loop: C_pos · P_pos · G_vel
@@ -84,8 +84,7 @@ for p in sorted(poles, key=lambda z: z.real):
 
 # -- Yes
 # Load CSV
-df1 = pd.read_csv("mlu_method2_v1/data.csv")
-df2 = pd.read_csv("mlu_method2_v3/data.csv")
+df1 = pd.read_csv("original_method2_v1/data.csv")
 
 #print(df.iloc[0])
 #print(df['/fmu/out/vehicle_odometry/position[0]'])
@@ -94,8 +93,8 @@ df2 = pd.read_csv("mlu_method2_v3/data.csv")
 #print(df['/fmu/out/vehicle_odometry/position[0]'])
 
 
-data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[4555:5555]
-data2 = df1['/fmu/out/vehicle_odometry/position[0]'].values[6555:7555]
+data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[5195:6195]
+data2 = df1['/fmu/out/vehicle_odometry/position[0]'].values[7195:8195]
 #data1 = df2['/fmu/out/vehicle_odometry/position[0]'].values[6800:7800]
 #data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[4810:5810]
 
@@ -113,7 +112,7 @@ plt.plot(t_out, y_out)
 plt.plot(t, data1)
 plt.plot(t, data2)
 plt.axhline(1.0, color='k', linestyle='--', linewidth=0.8, label='Setpoint')
-plt.title('Step Response of X-axis position (using implemented code)')
+plt.title('Step Response of X-axis position (using custom controller)')
 plt.xlabel('Time (s)')
 plt.ylabel('X-position (m)')
 plt.legend(['Transfer function', 'Px4-Autopilot (#1)', 'Px4-Autopilot (#2)'])

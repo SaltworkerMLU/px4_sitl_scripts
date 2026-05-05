@@ -259,7 +259,7 @@ class XYController:
 #             PositionControl::_velocityController()  (PID on vz)
 # ══════════════════════════════════════════════════════════════════════════════
 
-'''class ZController:
+class ZController:
     """
     Cascaded P(z) → PID(vz) → collective thrust (NED, D-axis).
 
@@ -355,9 +355,9 @@ class XYController:
             self._vel_int = float(np.clip(self._vel_int,
                                           -self.thr_max, self.thr_max))
 
-        return thrust_d   # already negative (NED upward)'''
+        return thrust_d   # already negative (NED upward)
 
-class ZController:
+'''class ZController:
     """
     Non-cascaded PID controller: z_error → collective thrust (NED, D-axis).
     Uses only measured z position — no velocity measurement required.
@@ -434,7 +434,7 @@ class ZController:
             self._int += error * dt
             self._int = float(np.clip(self._int, -self.thr_max, self.thr_max))
 
-        return thrust
+        return thrust'''
 
 '''class ZController:
     """
@@ -606,7 +606,7 @@ class PositionControllerNode(Node):
         self.dt      = 1.0 / self.RATE_HZ
 
         # ── Controllers ────────────────────────────────────────────────
-        self.xy_ctrl = XYController(hover_thrust=0.73)
+        #self.xy_ctrl = XYController(hover_thrust=0.73)
         self.z_ctrl  = ZController (hover_thrust=0.73)
         self.x_ctrl = PositionOnlyPDController()
         self.y_ctrl = PositionOnlyPDController()
@@ -669,9 +669,9 @@ class PositionControllerNode(Node):
     def _publish_attitude_setpoint(self):
         #self.pos_sp = np.array([float(self.counter/self.RATE_HZ), 0.0, -2.5])
         if self.counter % 2000 < 1000:
-            self.pos_sp = np.array([0.0, 0.0, -4.0])
+            self.pos_sp = np.array([1.0, 0.0, -2.5])
         else:
-            self.pos_sp = np.array([0.0, 0.0, -3.0])
+            self.pos_sp = np.array([0.0, 0.0, -2.5])
 
         # ── XY: position + velocity → horizontal thrust vector ─────────
         """thr_xy = self.xy_ctrl.update(
@@ -689,7 +689,7 @@ class PositionControllerNode(Node):
         thr_z = self.z_ctrl.update(
             z_sp = self.pos_sp[2],
             z    = self.pos[2],
-            #vz   = self.vel[2],
+            vz   = self.vel[2],
             dt   = self.dt,
         )
 
