@@ -61,7 +61,7 @@ y = df[OUTPUT_COL].values[idx_start:idx_end].astype(float)
 
 # --- Quaternion to Euler (PX4 format: q = [w, x, y, z]) ---
 quats = df[[
-    '/fmu/out/vehicle_odometry/q[0]',   # w
+    '/fmu/out/vehicle_o.5dometry/q[0]',   # w
     '/fmu/out/vehicle_odometry/q[1]',   # x
     '/fmu/out/vehicle_odometry/q[2]',   # y
     '/fmu/out/vehicle_odometry/q[3]'    # z

@@ -44,7 +44,7 @@ P_pos     = control.tf([1],    [1, 0])      # ẋ → x         (1/s)
 C_rate = control.tf([Kd_rate, Kp_rate, Ki_rate], [1, 0])   # PID on pitch rate
 C_att  = Kp_att                                              # P   on pitch angle
 C_vel  = control.tf([Kd_vel,  Kp_vel,  Ki_vel],  [1, 0])   # PID on velocity
-C_acc  = 1 / g                                               # accel → angle conversion
+C_acc  = 1 / g                                             # accel → angle conversion
 C_pos  = Kp_pos                                              # P   on position
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -64,12 +64,12 @@ G_att  = control.feedback(C_att * P_att * G_rate, 1)
 # Loop 2: velocity loop   ẋ_ref → ẋ
 #   open-loop: C_vel · C_acc · P_vel · G_att
 #   C_vel·C_acc maps velocity error to an angle reference
-G_vel  = control.feedback(C_vel * C_acc * P_vel * G_att, 1)
+G_vel  = control.feedback(C_vel * C_acc * P_vel * G_att, 1)   
 
 # Loop 1: position loop   x_ref → x
 #   open-loop: C_pos · P_pos · G_vel
 #   C_pos maps position error to a velocity reference
-G_pos  = control.feedback(C_pos * P_pos * G_vel, 1)
+G_pos  = control.feedback(C_pos * P_pos * G_vel, 1) #    
 
 # ── Minimal realisation & display ─────────────────────────────────────────
 G_min = control.minreal(G_pos, verbose=False)
@@ -84,16 +84,23 @@ for p in sorted(poles, key=lambda z: z.real):
 
 # -- Yes
 # Load CSV
-df1 = pd.read_csv("step_1/data.csv")
-df2 = pd.read_csv("step_1_v3/data.csv")
+df1 = pd.read_csv("mlu_method2_v1/data.csv")
+df2 = pd.read_csv("mlu_method2_v3/data.csv")
 
 #print(df.iloc[0])
 #print(df['/fmu/out/vehicle_odometry/position[0]'])
 
-#data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[200:1200]
-data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[4500:5500]
-data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[4190:5190]
-#data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[3370:4370]
+#print(df.iloc[0])
+#print(df['/fmu/out/vehicle_odometry/position[0]'])
+
+
+data1 = df1['/fmu/out/vehicle_odometry/position[0]'].values[4555:5555]
+data2 = df1['/fmu/out/vehicle_odometry/position[0]'].values[6555:7555]
+#data1 = df2['/fmu/out/vehicle_odometry/position[0]'].values[6800:7800]
+#data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[4810:5810]
+
+#data1 = df2['/fmu/out/vehicle_odometry/position[0]'].values[5900:6900]
+#data2 = df2['/fmu/out/vehicle_odometry/position[0]'].values[3910:4910]
 
 # ── Step response ─────────────────────────────────────────────────────────
 import matplotlib.pyplot as plt
@@ -106,7 +113,7 @@ plt.plot(t_out, y_out)
 plt.plot(t, data1)
 plt.plot(t, data2)
 plt.axhline(1.0, color='k', linestyle='--', linewidth=0.8, label='Setpoint')
-plt.title('Step Response of X-axis position (using PX4-based script)')
+plt.title('Step Response of X-axis position')
 plt.xlabel('Time (s)')
 plt.ylabel('X-position (m)')
 plt.legend(['Transfer function', 'Px4-Autopilot (#1)', 'Px4-Autopilot (#2)'])

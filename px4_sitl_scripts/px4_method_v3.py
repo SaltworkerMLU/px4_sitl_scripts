@@ -283,10 +283,10 @@ class ZController:
         Kd_vel: float  = 0.0,
         hover_thrust: float = 0.73,
         thr_min: float = 0.12,
-        thr_max: float = 0.90,
+        thr_max: float = 0.9,
         vel_max_up: float = 3.0,
         vel_max_dn: float = 1.0,
-        tau_d: float = 0.1,
+        tau_d: float = 0.0,
     ):
         self.Kp_pos      = Kp_pos
         self.Kp_vel      = Kp_vel
@@ -371,7 +371,7 @@ class PositionControllerNode(Node):
         self.yaw_sp = 0.0                            # rad
 
         # ── Control rate ───────────────────────────────────────────────
-        self.RATE_HZ = 50
+        self.RATE_HZ = 100
         self.dt      = 1.0 / self.RATE_HZ
 
         # ── Controllers ────────────────────────────────────────────────
@@ -416,10 +416,10 @@ class PositionControllerNode(Node):
     # ── Callbacks ──────────────────────────────────────────────────────
 
     def odometry_cb(self, msg: VehicleOdometry):
-        self.pos_0 = self.pos
         self.pos = np.array([msg.position[0], msg.position[1], msg.position[2]])
         #self.vel = np.array([msg.velocity[0], msg.velocity[1], msg.velocity[2]])
         self.vel = (self.pos - self.pos_0) * self.RATE_HZ
+        self.pos_0 = self.pos
 
     def timer_cb(self):
         self._publish_offboard_mode()
@@ -437,10 +437,10 @@ class PositionControllerNode(Node):
 
     def _publish_attitude_setpoint(self):
         #self.pos_sp = np.array([float(self.counter/self.RATE_HZ), 0.0, -2.5])
-        if self.counter % 1000 < 500:
-            self.pos_sp = np.array([1.0, 0.0, -2.5])
+        if self.counter % 2000 < 1000:
+            self.pos_sp = np.array([0.0, 0.0, -4.0])
         else:
-            self.pos_sp = np.array([0.0, 0.0, -2.5])
+            self.pos_sp = np.array([0.0, 0.0, -3.0])
 
         # ── XY: position + velocity → horizontal thrust vector ─────────
         thr_xy = self.xy_ctrl.update(
