@@ -30,7 +30,7 @@ Kp_vel  = 4.0;   Ki_vel  = 2.0;   Kd_vel  = 0.0
 
 #P_angacc  = control.tf([1],    [1, 0])      # τ → θ_dot     (1/Js)
 #P_att     = control.tf([1],    [1, 0])      # θ_dot → θ     (1/s)
-P_vel     = control.tf([m],    [1, -0.5])      # θ → ẋ         (g/s)
+P_vel     = control.tf([m],    [1, 0])      # θ → ẋ         (g/s)
 P_pos     = control.tf([1],    [1, 0])      # ẋ → x         (1/s)
 
 # ══════════════════════════════════════════════════════════════════════════

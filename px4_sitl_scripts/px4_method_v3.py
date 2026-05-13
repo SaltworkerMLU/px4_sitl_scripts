@@ -146,7 +146,7 @@ def thrust_to_attitude(thr_sp: np.ndarray, yaw_sp: float):
 #             PositionControl::_velocityController()  (PID on velocity, XY part)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class XYController:
+'''class XYController:
     """
     Cascaded P(pos) → PID(vel) → thrust vector [tx, ty] (NED, normalized).
 
@@ -246,6 +246,122 @@ class XYController:
         # max horizontal thrust given the Z thrust must stay above min
         # simplified: limit by tan(max_tilt)
         max_thr_h = np.tan(self.max_tilt)   # relative to unit vertical
+        thr_h_norm = np.linalg.norm(thr_xy)
+        if thr_h_norm > max_thr_h:
+            thr_xy = thr_xy / thr_h_norm * max_thr_h
+
+        return thr_xy'''
+
+class AxisController:
+    """
+    Cascaded P(pos) → PID(vel) → thrust (single axis, NED, normalised).
+
+    Gains mirror PX4 defaults:
+        MPC_XY_P          = 0.95
+        MPC_XY_VEL_P_ACC  = 1.8
+        MPC_XY_VEL_I_ACC  = 0.4
+        MPC_XY_VEL_D_ACC  = 0.2
+        MPC_THR_HOVER     = 0.73
+    """
+
+    def __init__(
+        self,
+        Kp_pos: float = 0.95,
+        Kp_vel: float = 1.8,
+        Ki_vel: float = 0.4,
+        Kd_vel: float = 0.2,
+        hover_thrust: float = 0.73,
+        max_vel: float = 5.0,
+        max_thr: float = 0.9,
+        tau_d: float = 0.1,
+    ):
+        self.Kp_pos      = Kp_pos
+        self.Kp_vel      = Kp_vel
+        self.Ki_vel      = Ki_vel
+        self.Kd_vel      = Kd_vel
+        self.hover_thrust = hover_thrust
+        self.max_vel     = max_vel
+        self.max_thr     = max_thr
+        self.tau_d       = tau_d
+
+        self._vel_int  = 0.0
+        self._vel_filt = 0.0
+
+    def reset(self):
+        self._vel_int  = 0.0
+        self._vel_filt = 0.0
+
+    def update(
+        self,
+        pos_sp: float,
+        pos:    float,
+        vel:    float,
+        dt:     float,
+    ) -> float:
+        if dt <= 0.0:
+            return 0.0
+
+        # ── 1. Position loop (P) → velocity setpoint ──────────────────
+        vel_sp = float(np.clip(
+            self.Kp_pos * (pos_sp - pos),
+            -self.max_vel, self.max_vel,
+        ))
+
+        # ── 2. Velocity loop (PID) → acceleration setpoint ────────────
+        vel_err = vel_sp - vel
+
+        alpha = self.tau_d / (self.tau_d + dt)
+        self._vel_filt = alpha * self._vel_filt + (1.0 - alpha) * vel
+
+        acc_sp = (
+            self.Kp_vel * vel_err
+            + self.Ki_vel * self._vel_int
+            - self.Kd_vel * self._vel_filt   # D on measurement (PX4 style)
+        )
+
+        # ── 3. Anti-windup ─────────────────────────────────────────────
+        thr_raw = acc_sp / 9.81 * self.hover_thrust
+        at_limit = abs(thr_raw) >= self.max_thr
+        winding_up = (thr_raw >= self.max_thr and vel_err >= 0.0) or \
+                     (thr_raw <= -self.max_thr and vel_err <= 0.0)
+
+        if not (at_limit and winding_up):
+            self._vel_int += vel_err * dt
+
+        # ── 4. acc → normalised thrust ─────────────────────────────────
+        thr = acc_sp / 9.81 * self.hover_thrust
+
+        return float(np.clip(thr, -self.max_thr, self.max_thr))
+
+
+class XYController:
+    """
+    Composes two independent AxisControllers for the x- and y-axes.
+    Tilt limiting is applied to the combined horizontal thrust vector.
+    """
+
+    def __init__(self, max_tilt: float = np.radians(35.0), **axis_kwargs):
+        self.max_tilt = max_tilt
+        self.x = AxisController(**axis_kwargs)
+        self.y = AxisController(**axis_kwargs)
+
+    def reset(self):
+        self.x.reset()
+        self.y.reset()
+
+    def update(
+        self,
+        pos_sp: np.ndarray,   # [x_ref, y_ref]  NED [m]
+        pos:    np.ndarray,   # [x,     y    ]  NED [m]
+        vel:    np.ndarray,   # [vx,    vy   ]  NED [m/s]
+        dt:     float,
+    ) -> np.ndarray:
+        thr_x = self.x.update(pos_sp[0], pos[0], vel[0], dt)
+        thr_y = self.y.update(pos_sp[1], pos[1], vel[1], dt)
+        thr_xy = np.array([thr_x, thr_y])
+
+        # ── Tilt limiting: project onto max tilt cone ──────────────────
+        max_thr_h = np.tan(self.max_tilt)
         thr_h_norm = np.linalg.norm(thr_xy)
         if thr_h_norm > max_thr_h:
             thr_xy = thr_xy / thr_h_norm * max_thr_h
@@ -375,7 +491,8 @@ class PositionControllerNode(Node):
         self.dt      = 1.0 / self.RATE_HZ
 
         # ── Controllers ────────────────────────────────────────────────
-        self.xy_ctrl = XYController(hover_thrust=0.73)
+        self.x_ctrl = AxisController(hover_thrust=0.73)
+        self.y_ctrl = AxisController(hover_thrust=0.73)
         self.z_ctrl  = ZController (hover_thrust=0.73)
 
         # ── Odometry state ─────────────────────────────────────────────
@@ -438,15 +555,21 @@ class PositionControllerNode(Node):
     def _publish_attitude_setpoint(self):
         #self.pos_sp = np.array([float(self.counter/self.RATE_HZ), 0.0, -2.5])
         if self.counter % 2000 < 1000:
-            self.pos_sp = np.array([0.0, 0.0, -4.0])
+            self.pos_sp = np.array([0.0, 0.0, -2.5])
         else:
-            self.pos_sp = np.array([0.0, 0.0, -3.0])
+            self.pos_sp = np.array([1.0, 0.0, -2.5])
 
         # ── XY: position + velocity → horizontal thrust vector ─────────
-        thr_xy = self.xy_ctrl.update(
-            pos_sp = self.pos_sp[:2],
-            pos    = self.pos[:2],
-            vel    = self.vel[:2],
+        thr_x = self.x_ctrl.update(
+            pos_sp = self.pos_sp[0],
+            pos    = self.pos[0],
+            vel    = self.vel[0],
+            dt     = self.dt,
+        )
+        thr_y = self.y_ctrl.update(
+            pos_sp = self.pos_sp[1],
+            pos    = self.pos[1],
+            vel    = self.vel[1],
             dt     = self.dt,
         )
 
@@ -463,7 +586,7 @@ class PositionControllerNode(Node):
         # horizontal is added. Total thrust vector in NED world frame:
         #   thr_sp = [tx, ty, thr_z]
         # Note: thr_z is already negative (upward).
-        thr_sp = np.array([thr_xy[0], thr_xy[1], thr_z])
+        thr_sp = np.array([thr_x, thr_y, thr_z])
 
         # ── Convert thrust vector → attitude quaternion + scalar thrust ─
         # This is the exact Python translation of:
