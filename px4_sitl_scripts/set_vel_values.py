@@ -84,12 +84,12 @@ class MotorCommander(Node):
         # Alternate between two positions to create a back-and-forth motion in the x-axis
         if self.counter % 2000 < 1000:
             msg.acceleration = [float('nan')] * 3# [0.0, 0.0, 0.0]
-            msg.velocity = [float('nan')] * 3# [-1.0, 0.0, 0.0] # [float('nan')] * 3
-            msg.position = [0.0, 0.0, -21.0] # [self.counter*0.02, 0.0, -2.5]
+            msg.velocity = [float('nan')] * 3 # [-1.0, 0.0, 0.0] # [float('nan')] * 3
+            msg.position = [0.0, 0.0, -2.5] # [self.counter*0.02, 0.0, -2.5]
         else:
-            msg.acceleration = [float('nan')] * 3# [0.0, 0.0, 0.0]
-            msg.velocity = [float('nan')] * 3# [0.0, 0.0, 0.0] # [float('nan')] * 3
-            msg.position = [0.0, 0.0, -20.0] # [self.counter*0.02, 0.0, -2.5]
+            msg.acceleration = [float('nan')] * 3 # [0.0, 0.0, 0.0]
+            msg.velocity = [float('nan')] * 3 # [0.0, 0.0, 0.0] # [float('nan')] * 3
+            msg.position = [1.0, 0.0, -2.5] # [self.counter*0.02, 0.0, -2.5]
 
         msg.yaw = 0.0
         msg.timestamp = self.get_clock().now().nanoseconds // 1000

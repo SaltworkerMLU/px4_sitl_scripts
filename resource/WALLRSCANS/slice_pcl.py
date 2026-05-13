@@ -2,7 +2,7 @@ import open3d as o3d
 import numpy as np
 
 # ملفات الإدخال والإخراج
-INPUT_FILE = "WALLR1.pcd"
+INPUT_FILE = "WALLR3.pcd"
 OUTPUT_FILE = "rc_car_template.pcd"
 
 # حدود الصندوق (عدّلها حسب بياناتك)

@@ -85,17 +85,18 @@ for p in sorted(poles, key=lambda z: z.real):
 
 # -- Yes
 # Load CSV
-df1 = pd.read_csv("PID_step_1_z_v3/data.csv")
-df2 = pd.read_csv("px4_method2_v2/data.csv")
+df1 = pd.read_csv("mlu_method2_z_v1/data.csv")
+#df2 = pd.read_csv("px4_method2_v2/data.csv")
 
 #print(df.iloc[0])
 #print(df['/fmu/out/vehicle_odometry/position[0]'])
 
-data2 = df2['/fmu/out/vehicle_odometry/position[2]'].values[1700:2700]
+#data2 = df2['/fmu/out/vehicle_odometry/position[2]'].values[1700:2700]
 #data2 = df2['/fmu/out/vehicle_odometry/position[2]'].values[6850:7850]
-#data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[6435:7435]
+data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[6125:7125]
+data2 = df1['/fmu/out/vehicle_odometry/position[2]'].values[8115:9115]
 #data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[7245:8245]
-data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[13230:14230]
+#data1 = df1['/fmu/out/vehicle_odometry/position[2]'].values[13230:14230]
 
 # ── Step response ─────────────────────────────────────────────────────────
 import matplotlib.pyplot as plt
@@ -105,10 +106,10 @@ t_out, y_out = control.step_response(G_pos, T=t)
 
 plt.figure(figsize=(9, 4))
 plt.plot(t_out, y_out)
-#plt.plot(t, data1 + 21*np.ones(len(data1)))
-plt.plot(t, data2+ 1.9*np.ones(len(data2)))
+plt.plot(t, data1 + 3.9*np.ones(len(data1)))
+plt.plot(t, data2+ 3.9*np.ones(len(data2)))
 plt.axhline(1.0, color='k', linestyle='--', linewidth=0.8, label='Setpoint')
-plt.title('Step Response of Z-axis position')
+plt.title('Step Response of Z-axis position (using implemented code)')
 plt.xlabel('Time (s)')
 plt.ylabel('Z-position (m)')
 plt.legend(['Transfer function', 'Px4-Autopilot (#1)', 'Px4-Autopilot (#2)'])

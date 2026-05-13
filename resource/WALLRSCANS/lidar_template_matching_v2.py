@@ -286,6 +286,41 @@ def visualize_local_match(template, scene, transformation, box_size=1.0):
         bbox
     ])
 
+def execute_global_registration(
+    source_down,
+    target_down,
+    source_fpfh,
+    target_fpfh,
+    voxel_size
+):
+    """
+    Coarse alignment using Fast Global Registration (FGR).
+    More stable and faster than RANSAC.
+    """
+
+    distance_threshold = voxel_size * 1.5
+
+    print("Running Fast Global Registration...")
+
+    result = o3d.pipelines.registration.registration_fgr_based_on_feature_matching(
+        source_down,
+        target_down,
+        source_fpfh,
+        target_fpfh,
+
+        o3d.pipelines.registration.FastGlobalRegistrationOption(
+            maximum_correspondence_distance=distance_threshold,
+
+            # Optional tuning:
+            iteration_number=1000,
+            maximum_tuple_count=1000,
+            tuple_scale=0.95,
+            tuple_test=True
+        )
+    )
+
+    return result
+
 # -------------------------------------------------------
 # MAIN
 # -------------------------------------------------------
@@ -305,33 +340,25 @@ def main():
     template_down, template_fpfh = preprocess_point_cloud(template, VOXEL_SIZE)
 
     # Global registration
-    result_ransac = execute_global_registration(
-        template_down,
-        scene_down,
-        template_fpfh,
-        scene_fpfh,
-        VOXEL_SIZE
+    result_global = execute_global_registration(
+    template_down,
+    scene_down,
+    template_fpfh,
+    scene_fpfh,
+    VOXEL_SIZE
     )
 
     print("\nInitial transformation:")
-    print(result_ransac.transformation)
+    print(result_global.transformation)
 
-    print(f"RANSAC fitness: {result_ransac.fitness}")
-    print(f"RANSAC RMSE: {result_ransac.inlier_rmse}")
+    print(f"Global fitness: {result_global.fitness}")
+    print(f"Global RMSE: {result_global.inlier_rmse}")
 
     # ICP refinement
     result_icp = refine_registration(
         template,
         scene,
-        result_ransac.transformation,
-        VOXEL_SIZE
-    )
-
-    # After ICP refinement
-    result_icp = refine_registration(
-        template,
-        scene,
-        result_ransac.transformation,
+        result_global.transformation,
         VOXEL_SIZE
     )
 
@@ -348,30 +375,6 @@ def main():
         result_icp.transformation,
         box_size=2.0  # adjust based on RC car size
     )
-
-    """print("\nRefined transformation:")
-    print(result_icp.transformation)
-
-    print(f"ICP fitness: {result_icp.fitness}")
-    print(f"ICP RMSE: {result_icp.inlier_rmse}")
-
-    result_ransac_trans = np.array(result_ransac.transformation)
-    print(result_ransac_trans[0:3, 3])
-    min_bound = np.array(result_ransac_trans[0:3, 3]) - np.array([5.0, 5.0, 5.0]) # [xmin, ymin, zmin]
-    max_bound = np.array(result_ransac_trans[0:3, 3]) + np.array([5.0, 5.0, 5.0]) # [xmax, ymax, zmax]
-
-    bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound, max_bound)
-    cropped = scene.crop(bbox)
-
-    # Visualize
-    draw_registration_result(
-        template,
-        cropped,
-        result_icp.transformation
-    )
-
-    o3d.io.write_point_cloud("result.pcd", cropped)"""
-
 
 if __name__ == "__main__":
     main()
