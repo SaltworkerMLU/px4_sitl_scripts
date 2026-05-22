@@ -85,11 +85,11 @@ class MotorCommander(Node):
         if self.counter % 2000 < 1000:
             msg.acceleration = [float('nan')] * 3# [0.0, 0.0, 0.0]
             msg.velocity = [float('nan')] * 3 # [-1.0, 0.0, 0.0] # [float('nan')] * 3
-            msg.position = [0.0, 0.0, -2.0] # [self.counter*0.02, 0.0, -2.5]
+            msg.position = [0.0, 0.0, -2.5] # [self.counter*0.02, 0.0, -2.5]
         else:
             msg.acceleration = [float('nan')] * 3 # [0.0, 0.0, 0.0]
             msg.velocity = [float('nan')] * 3 # [0.0, 0.0, 0.0] # [float('nan')] * 3
-            msg.position = [0.0, 0.0, -1.0] # [self.counter*0.02, 0.0, -2.5]
+            msg.position = [0.0, 1.0, -2.5] # [self.counter*0.02, 0.0, -2.5]
 
         msg.yaw = 0.0
         msg.timestamp = self.get_clock().now().nanoseconds // 1000
